@@ -39,5 +39,6 @@ public class PartnerEntity {
     private String taxNumber;
     private String username;
     private Integer wardId;
+    private String phoneNumber;
 
 }
