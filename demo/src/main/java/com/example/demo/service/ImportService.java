@@ -1,18 +1,18 @@
 package com.example.demo.service;
 
+import com.example.demo.entitys.PartnerEntity;
 import com.example.demo.repositorys.ImportRepository;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
+import com.example.demo.repositorys.PartnerRepository;
 import jakarta.transaction.Transactional;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -26,6 +26,9 @@ public class ImportService {
 
     @Autowired
     private ImportRepository importRepository;
+
+    @Autowired
+    private PartnerRepository partnerRepository;
 
     @Transactional
     public <T> void importExcelFile(MultipartFile file, Class<T> clazz, JpaRepository<T, ?> repository) {
@@ -74,6 +77,13 @@ public class ImportService {
                                             .toFormatter();
                                     LocalDateTime dateTime = LocalDateTime.parse(cell.getStringCellValue(), formatter);
                                     field.set(obj, dateTime);
+                                } else if (field.getType().equals(LocalDate.class)) {
+                                    DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("d/M/yyyy");
+                                    if (cell.getCellType() == CellType.STRING) {
+                                        field.set(obj, LocalDate.parse(cell.getStringCellValue().trim(), dateFormatter));
+                                    } else if (cell.getCellType() == CellType.NUMERIC) {
+                                        field.set(obj, cell.getLocalDateTimeCellValue().toLocalDate());
+                                    }
                                 } else if (field.getType() == Boolean.class || field.getType() == boolean.class) {
                                     String value = cell.getStringCellValue().trim().toLowerCase();
                                     field.set(obj, value.equals("true") || value.equals("1") || value.equals("yes"));
@@ -94,7 +104,13 @@ public class ImportService {
                                 } else if (field.getType() == Long.class || field.getType() == long.class) {
                                     field.set(obj, (long) cell.getNumericCellValue());
                                 } else {
-                                    field.set(obj, cell.getNumericCellValue());
+                                    if (field.getType().equals(PartnerEntity.class)) {
+                                        Long id = (long) cell.getNumericCellValue();
+                                        PartnerEntity partner = partnerRepository.findById(id)
+                                                .orElseThrow(() -> new RuntimeException("Không tìm thấy PartnerEntity với ID: " + id));
+                                        field.set(obj, partner);
+                                    }
+
                                 }
                             }
                             case BOOLEAN -> field.set(obj, cell.getBooleanCellValue());
@@ -114,4 +130,30 @@ public class ImportService {
             throw new RuntimeException("Lỗi khi đọc file Excel: " + e.getMessage(), e);
         }
     }
+    private DateTimeFormatter getFlexibleDateTimeFormatter() {
+        List<String> patterns = List.of(
+            "dd/MM/yyyy HH:mm:ss.SSSSSS",
+            "dd/MM/yyyy HH:mm:ss.SSS",
+            "dd/MM/yyyy HH:mm:ss",
+            "M/d/yyyy H:mm:ss.SSSSSS",
+            "M/d/yyyy H:mm:ss.SSS",
+            "M/d/yyyy H:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd HH:mm:ss"
+        );
+    
+        return new DateTimeFormatterBuilder()
+            .appendOptional(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.SSSSSS"))
+            .appendOptional(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss.SSS"))
+            .appendOptional(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            .appendOptional(DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss.SSSSSS"))
+            .appendOptional(DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss.SSS"))
+            .appendOptional(DateTimeFormatter.ofPattern("M/d/yyyy H:mm:ss"))
+            .appendOptional(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS"))
+            .appendOptional(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS"))
+            .appendOptional(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            .toFormatter(Locale.getDefault());
+    }
+    
 }
