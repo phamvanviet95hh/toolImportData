@@ -105,10 +105,10 @@ public class ImportService {
                     }
                 }
                 entities.add(obj);
-                repository.save(obj);
+//                repository.save(obj);
             }
 
-            // repository.saveAll(entities);
+             repository.saveAll(entities);
 
         } catch (Exception e) {
             throw new RuntimeException("Lỗi khi đọc file Excel: " + e.getMessage(), e);
